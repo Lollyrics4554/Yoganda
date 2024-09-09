@@ -1,0 +1,421 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Graphic Design App</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+body {
+    font-family: Arial, sans-serif;
+    height: 99vh;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    background-color: #f5f5f5;
+    overflow: hidden; /* Prevent page scrolling */
+}
+
+.app {
+    position: relative;
+    width: 100vw;
+    height: 80vh;
+    background-color: white;
+    border: 1px solid #333;
+    border-radius: 8px;
+    overflow: hidden; /* Prevent internal scrolling */
+}
+        .canvas-wrapper {
+            width: 100%;
+            height: 80%;
+            background-color: #eaeaea;
+            position: relative;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        #canvas {
+            position: relative;
+            width: 300px;
+            height: 300px;
+            background-color: white;
+            border: 1px solid #ddd;
+            overflow: hidden; /* Restrict overflow */
+        }
+
+        .add-btn {
+            position: absolute;
+            right: 20px;
+            bottom: 20px;
+            width: 50px;
+            height: 50px;
+            background-color: #06205F;
+            border-radius: 50%;
+            color: white;
+            font-size: 24px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            cursor: pointer;
+        }
+
+        .bottom-panel {
+            position: absolute;
+            top: 300px;
+            left: -300px; /* Initially positioned off-screen */
+            width: 260px; /* Adjust the width as needed */
+            height: 380px;
+            background-color: #333;
+            transition: left 0.2s ease-in-out;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            border-radius: 15px;
+        }
+
+        .bottom-panel.active {
+            left: 0; /* Slide in from the left */
+        }
+
+        .panel-content {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .shape {
+            background-color: #007bff;
+            color: white;
+            padding: 10px 20px;
+            margin: 10px;
+            border-radius: 5px;
+            cursor: pointer;
+            text-align: center;
+            width: 100px;
+        }
+
+        .shape:hover {
+            background-color: #0056b3;
+        }
+
+        .shape-element {
+            position: absolute;
+            cursor: move;
+            border: 2px solid transparent;
+            touch-action: none;
+        }
+
+        .shape-element.selected {
+            border: 2px solid #007bff;
+        }
+
+        .resize-handle {
+            position: absolute;
+            width: 10px;
+            height: 10px;
+            background-color: #007bff;
+            border-radius: 50%;
+            cursor: pointer;
+            touch-action: none;
+        }
+
+        .top-left { top: -5px; left: -5px; }
+        .top-right { top: -5px; right: -5px; }
+        .bottom-left { bottom: -5px; left: -5px; }
+        .bottom-right { bottom: -5px; right: -5px; }
+        /* Existing handle styles for corners */
+.top-left { top: -5px; left: -5px; }
+.top-right { top: -5px; right: -5px; }
+.bottom-left { bottom: -5px; left: -5px; }
+.bottom-right { bottom: -5px; right: -5px; }
+
+/* Edge handles */
+.top-middle { top: -5px; left: calc(50% - 5px); }
+.bottom-middle { bottom: -5px; left: calc(50% - 5px); }
+.left-middle { left: -5px; top: calc(50% - 5px); }
+.right-middle { right: -5px; top: calc(50% - 5px); }
+    </style>
+</head>
+<body>
+
+    <div class="app">
+        <div class="canvas-wrapper" id="canvas-wrapper">
+            <div id="canvas"></div>
+        </div>
+
+        <div class="add-btn" id="add-btn">+</div>
+
+        <div class="bottom-panel" id="bottom-panel">
+            <div class="panel-content">
+                <div class="shape" onclick="addShape('rectangle')">Rectangle</div>
+                <div class="shape" onclick="addShape('circle')">Circle</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const addBtn = document.getElementById('add-btn');
+        const bottomPanel = document.getElementById('bottom-panel');
+        const canvas = document.getElementById('canvas');
+        const canvasWrapper = document.getElementById('canvas-wrapper');
+        let selectedElement = null;
+        let isResizing = false;
+        let isDragging = false;
+        let isPanelActive = false;
+        let startX, startY, startWidth, startHeight, startLeft, startTop;
+
+        // Toggle the panel on button click
+        addBtn.addEventListener('click', () => {
+            isPanelActive = !isPanelActive;
+            bottomPanel.classList.toggle('active', isPanelActive);
+            if (isPanelActive) {
+                document.addEventListener('touchstart', handlePanelSwipeStart);
+                document.addEventListener('touchend', handlePanelSwipeEnd);
+                document.addEventListener('click', handleOutsideClick);
+            } else {
+                removeEventListeners();
+            }
+        });
+
+        // Handle touch events for swiping the panel
+        function handlePanelSwipeStart(e) {
+            startX = e.touches[0].clientX;
+        }
+
+        function handlePanelSwipeEnd(e) {
+            const endX = e.changedTouches[0].clientX;
+            if (startX - endX > 50) { // Swipe distance threshold
+                isPanelActive = false;
+                bottomPanel.classList.remove('active');
+                removeEventListeners();
+            }
+        }
+
+        function handleOutsideClick(e) {
+            if (!bottomPanel.contains(e.target) && !addBtn.contains(e.target)) {
+                isPanelActive = false;
+                bottomPanel.classList.remove('active');
+                removeEventListeners();
+            }
+        }
+
+        function removeEventListeners() {
+            document.removeEventListener('touchstart', handlePanelSwipeStart);
+            document.removeEventListener('touchend', handlePanelSwipeEnd);
+            document.removeEventListener('click', handleOutsideClick);
+        }
+
+        function addShape(type) {
+            const element = document.createElement('div');
+            element.classList.add('shape-element');
+            element.style.width = '100px';
+            element.style.height = '100px';
+
+            if (type === 'rectangle') {
+                element.style.backgroundColor = 'red';
+            } else if (type === 'circle') {
+                element.style.backgroundColor = 'green';
+                element.style.borderRadius = '50%';
+            }
+
+            element.style.top = '50px';
+            element.style.left = '50px';
+            canvas.appendChild(element);
+
+            element.addEventListener('click', (e) => {
+                e.stopPropagation();
+                selectElement(e.target);
+            });
+
+            makeElementDraggable(element);
+        }
+
+        function selectElement(element) {
+            deselectElement(); // Deselect any previously selected element
+            selectedElement = element;
+            selectedElement.classList.add('selected');
+            addResizeHandles(selectedElement);
+        }
+
+        function deselectElement() {
+            if (selectedElement) {
+                selectedElement.classList.remove('selected');
+                removeResizeHandles();
+                selectedElement = null;
+            }
+        }
+
+        function addResizeHandles(element) {
+            const handlePositions = ['top-left', 'top-right', 'bottom-left', 'bottom-right'];
+            handlePositions.forEach(pos => {
+                const handle = document.createElement('div');
+                handle.classList.add('resize-handle', pos);
+                element.appendChild(handle);
+
+                handle.addEventListener('touchstart', (e) => {
+                    e.stopPropagation();
+                    isResizing = true;
+                    startResize(e, pos, element);
+                });
+            });
+        }
+
+        function removeResizeHandles() {
+            const handles = document.querySelectorAll('.resize-handle');
+            handles.forEach(handle => handle.remove());
+        }
+
+        function makeElementDraggable(element) {
+            element.addEventListener('touchstart', (e) => {
+                e.stopPropagation();
+                isDragging = true;
+                startX = e.touches[0].clientX;
+                startY = e.touches[0].clientY;
+                startLeft = parseInt(element.style.left, 10);
+                startTop = parseInt(element.style.top, 10);
+
+                document.addEventListener('touchmove', dragElement);
+                document.addEventListener('touchend', stopDragging);
+            });
+function addResizeHandles(element) {
+    const handlePositions = [
+        'top-left', 'top-right', 'bottom-left', 'bottom-right',
+        'top-middle', 'bottom-middle', 'left-middle', 'right-middle' // Edge handles
+    ];
+
+    handlePositions.forEach(pos => {
+        const handle = document.createElement('div');
+        handle.classList.add('resize-handle', pos);
+        element.appendChild(handle);
+
+        handle.addEventListener('touchstart', (e) => {
+            e.stopPropagation();
+            isResizing = true;
+            startResize(e, pos, element);
+        });
+    });
+}
+
+function startResize(e, position, element) {
+    startWidth = parseInt(getComputedStyle(element).width, 10);
+    startHeight = parseInt(getComputedStyle(element).height, 10);
+    startX = e.touches[0].clientX;
+    startY = e.touches[0].clientY;
+    startLeft = parseInt(getComputedStyle(element).left, 10);
+    startTop = parseInt(getComputedStyle(element).top, 10);
+
+    document.addEventListener('touchmove', resizeElement);
+    document.addEventListener('touchend', stopResizing);
+
+    function resizeElement(e) {
+        let newWidth = startWidth, newHeight = startHeight;
+
+        const dx = e.touches[0].clientX - startX;
+        const dy = e.touches[0].clientY - startY;
+
+        if (position.includes('right')) {
+            newWidth = startWidth + dx;
+        } else if (position.includes('left')) {
+            newWidth = startWidth - dx;
+            element.style.left = `${startLeft + dx}px`;
+        }
+
+        if (position.includes('bottom')) {
+            newHeight = startHeight + dy;
+        } else if (position.includes('top')) {
+            newHeight = startHeight - dy;
+            element.style.top = `${startTop + dy}px`;
+        }
+
+        // Edge handle-specific resizing
+        if (position.includes('middle')) {
+            if (position.includes('top') || position.includes('bottom')) {
+                newHeight = startHeight + (position.includes('top') ? -dy : dy);
+            } else if (position.includes('left') || position.includes('right')) {
+                newWidth = startWidth + (position.includes('left') ? -dx : dx);
+            }
+        }
+
+        element.style.width = `${Math.max(30, newWidth)}px`;
+        element.style.height = `${Math.max(30, newHeight)}px`;
+    }
+
+    function stopResizing() {
+        isResizing = false;
+        document.removeEventListener('touchmove', resizeElement);
+        document.removeEventListener('touchend', stopResizing);
+    }
+}
+            function dragElement(e) {
+                if (isDragging && !isResizing) {
+                    const x = e.touches[0].clientX - startX;
+                    const y = e.touches[0].clientY - startY;
+                    const newLeft = Math.max(-element.clientWidth, Math.min(startLeft + x, canvas.clientWidth));
+                    const newTop = Math.max(-element.clientHeight, Math.min(startTop + y, canvas.clientHeight));
+                    element.style.left = `${newLeft}px`;
+                    element.style.top = `${newTop}px`;
+                }
+            }
+
+            function stopDragging() {
+                isDragging = false;
+                document.removeEventListener('touchmove', dragElement);
+                document.removeEventListener('touchend', stopDragging);
+            }
+        }
+
+        function startResize(e, position, element) {
+            startWidth = parseInt(getComputedStyle(element).width, 10);
+            startHeight = parseInt(getComputedStyle(element).height, 10);
+            startX = e.touches[0].clientX;
+            startY = e.touches[0].clientY;
+            startLeft = parseInt(getComputedStyle(element).left, 0);
+            startTop = parseInt(getComputedStyle(element).top, 0);
+
+            document.addEventListener('touchmove', resizeElement);
+            document.addEventListener('touchend', stopResizing);
+
+            function resizeElement(e) {
+                let newWidth, newHeight;
+
+                const dx = e.touches[0].clientX - startX;
+                const dy = e.touches[0].clientY - startY;
+
+                if (position.includes('right')) {
+                    newWidth = startWidth + dx;
+                } else if (position.includes('left')) {
+                    newWidth = startWidth - dx;
+                    element.style.left = `${startLeft + dx}px`;
+                }
+
+                if (position.includes('bottom')) {
+                    newHeight = startHeight + dy;
+                } else if (position.includes('top')) {
+                    newHeight = startHeight - dy;
+                    element.style.top = `${startTop + dy}px`;
+                }
+
+                element.style.width = `${Math.max(0, newWidth)}px`; // Min width to prevent collapse
+                element.style.height = `${Math.max(0, newHeight)}px`; // Min height to prevent collapse
+            }
+
+            function stopResizing() {
+                isResizing = false;
+                document.removeEventListener('touchmove', resizeElement);
+                document.removeEventListener('touchend', stopResizing);
+            }
+        }
+
+        // Deselect element on canvas click
+        canvasWrapper.addEventListener('click', () => {
+            deselectElement();
+        });
+    </script>
+</body>
+</html>
